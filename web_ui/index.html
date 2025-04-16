@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TubeSter.top - YouTube Channel Video List Downloader | Save Video URLs</title>
+<meta name="description" content="TubeSter.top - Download or save YouTube channel video URLs easily as CSV files. Choose to save to your folder or download directly. Fast, simple, privacy-friendly tool.">
+<meta name="keywords" content="TubeSter.top, YouTube downloader, video URL extractor, save YouTube URLs, download CSV, YouTube channel videos, YouTube video list, YouTube scraper">
+<meta name="author" content="TubeSter.top">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="TubeSter.top - YouTube Channel Video List Downloader">
+<meta property="og:description" content="Download or save YouTube channel video URLs easily as CSV files. The fastest and most reliable YouTube video list tool.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.tubester.top">
+<meta property="og:image" content="https://www.tubester.top/logo.png">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="container">
+    <header>
+      <h1>TubeSter.top - Video List Downloader</h1>
+      <nav class="main-nav">
+        <a href="features.html" class="feature-link">🔍 View Features & Capabilities</a>
+      </nav>
+    </header>
+    <main>
+      <section class="intro-section">
+        <h2>Extract YouTube Channel Videos</h2>
+        <p>
+          Professional tool to download video lists from any YouTube channel. Export metadata, organize content, and manage your video library efficiently.
+        </p>
+        <div class="feature-highlights">
+          <span class="highlight-badge">✨ Free to Use</span>
+          <span class="highlight-badge">🚀 Fast Processing</span>
+          <span class="highlight-badge">📊 CSV Export</span>
+          <span class="highlight-badge">🔒 Privacy Focused</span>
+        </div>
+      </section>
+
+    <label>Fetch Method:</label>
+    <div>
+      <label><input type="radio" name="fetchMethod" value="yt-dlp" checked> yt-dlp (default)</label>
+      <label><input type="radio" name="fetchMethod" value="youtube-api"> YouTube Data API</label>
+    </div>
+
+    <div id="apiKeyContainer" style="display:none; margin-top:10px;">
+      <label for="apiKeyInput">YouTube API Key:</label>
+      <input type="text" id="apiKeyInput" placeholder="Enter your YouTube Data API key" />
+      <div style="margin-top: 5px;">
+        <a href="apikey.html" style="color: #60a5fa; text-decoration: none; font-size: 0.9rem;">
+          ℹ️ Don't have an API key? Click here for instructions
+        </a>
+      </div>
+    </div>
+
+    <label for="channelUrl">YouTube Channel URL:</label>
+    <input
+      type="text"
+      id="channelUrl"
+      placeholder="e.g., https://www.youtube.com/@datasciencecentral"
+    />
+
+    <label>Search Type:</label>
+    <div class="search-type">
+      <label><input type="radio" name="searchType" value="basic" checked> Basic Search (Faster, Limited Fields)</label>
+      <label><input type="radio" name="searchType" value="advanced"> Advanced Search (Slower, All Fields)</label>
+    </div>
+
+    <div id="exportFieldsSection">
+      <label>Export Fields:</label>
+      <div class="export-fields">
+        <label><input type="checkbox" name="exportField" value="Title" checked> Title</label>
+        <label><input type="checkbox" name="exportField" value="URL" checked> URL</label>
+        <label><input type="checkbox" name="exportField" value="ID"> ID</label>
+      </div>
+      <div id="advancedFields" style="display:none; margin-top: 10px;">
+        <label>Advanced Fields:</label>
+        <div class="export-fields">
+          <label><input type="checkbox" name="exportField" value="Description"> Description</label>
+          <label><input type="checkbox" name="exportField" value="Published Date"> Published Date</label>
+          <label><input type="checkbox" name="exportField" value="Duration"> Duration</label>
+          <label><input type="checkbox" name="exportField" value="Views"> Views</label>
+          <label><input type="checkbox" name="exportField" value="Likes"> Likes</label>
+          <label><input type="checkbox" name="exportField" value="Comments"> Comments</label>
+          <label><input type="checkbox" name="exportField" value="Thumbnail URL"> Thumbnail URL</label>
+        </div>
+      </div>
+    </div>
+
+    <label>Output Option:</label>
+    <div class="output-option">
+      <label><input type="radio" name="outputOption" value="save"> Save to Folder</label>
+      <label><input type="radio" name="outputOption" value="download" checked> Download File</label>
+      <div class="info-text">(Save to folder creates a channel folder with results, Download saves directly to your downloads)</div>
+    </div>
+
+    <div id="saveDirSection">
+      <label for="outputDir">Output Directory Path (for Save to Folder option):</label>
+      <div class="output-dir-container">
+        <input
+          type="text"
+          id="outputDir"
+          placeholder="e.g., D:\Downloads\YouTubeChannels"
+        />
+        <button type="button" id="browseBtn">📁 Browse</button>
+      </div>
+    </div>
+
+    <button id="downloadBtn">🚀 Get Video List</button>
+
+    <div id="result" class="result" readonly></div>
+
+    <div id="spinner" class="spinner" style="display:none;"></div>
+
+    <a id="downloadCsvBtn" href="#" style="display: none" download>
+      <button type="button">⬇️ Download CSV</button>
+    </a>
+
+    <div class="donation-section">
+      <p>🚀 Love TubeSter.top? Help keep it running and ad-free!</p>
+      <a href="https://buymeacoffee.com/jollyday" target="_blank" class="bmc-link">
+        ☕ Buy me a coffee
+      </a>
+      <p style="font-size: 0.9rem; margin-top: 1rem;">Your support helps maintain and improve this free tool 💖</p>
+    </div>
+
+    <footer style="font-size: 0.9rem; color: #94a3b8; margin-top: 3rem; text-align: center; padding: 2rem;">
+      <p style="margin-bottom: 1rem;">
+        TubeSter.top is not affiliated with YouTube or Google. Users are responsible for ensuring they have the right to access content.
+        Downloading copyrighted material without permission may violate YouTube's Terms of Service and applicable laws.
+      </p>
+      <a href="terms.html" style="color: #60a5fa; text-decoration: none; font-weight: 500; transition: all 0.2s ease;">
+        Terms of Service
+      </a>
+    </footer>
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
