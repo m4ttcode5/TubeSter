@@ -4,6 +4,7 @@ import csv
 import sys
 import subprocess
 import tempfile
+import json
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from dotenv import load_dotenv
 import requests
@@ -24,6 +25,9 @@ EXPORT_FIELD_MAP = {
     "Comments": "%(comment_count)s",
     "Thumbnail URL": "%(thumbnail)s"
 }
+
+# Define fields available in basic (flat) mode
+BASIC_FIELDS = ["Title", "URL", "ID"]
 
 def extract_channel_name(url):
     patterns = [
@@ -57,728 +61,13 @@ def extract_channel_name(url):
     else:
         return None
 
-# Define fields available in basic (flat) mode
-BASIC_FIELDS = ["Title", "URL", "ID"]
-
-def get_videos_and_save(channel_url, output_dir, output_option, export_fields, search_type="advanced"): # Add search_type parameter
-    if not channel_url:
-        return "Error: Please provide a Channel URL.", None
-
-    if output_option == "save" and not output_dir:
-        return "Error: Please provide an Output Directory.", None
-
-    if not export_fields:
-        return "Error: Please select at least one export field.", None
-
-    # Validate fields based on search type
-    if search_type == "basic":
-        invalid_fields = [field for field in export_fields if field not in BASIC_FIELDS]
-        if invalid_fields:
-            return f"Error: The following fields are not available in Basic Search: {', '.join(invalid_fields)}. Please select only Title, URL, or ID, or use Advanced Search.", None
-        # Filter export_fields to only basic ones for safety, though UI should handle this
-        export_fields = [field for field in export_fields if field in BASIC_FIELDS]
-        if not export_fields: # Handle case where filtering leaves no fields
-             return "Error: Please select at least Title, URL, or ID for Basic Search.", None
-
-
-    if not re.match(r"https?://(www\.)?youtube\.com/", channel_url, re.IGNORECASE):
-        return "Error: Invalid YouTube URL format. Must start with http(s)://youtube.com/", None
-
-    channel_name = extract_channel_name(channel_url)
-    if not channel_name:
-        return f"Error: Could not extract a usable channel name from the URL: {channel_url}", None
-
-    if output_option == "save":
-        # Normalize and validate output directory path
-        try:
-            output_dir = os.path.normpath(output_dir)
-            if not os.path.isabs(output_dir):
-                output_dir = os.path.abspath(output_dir)
-            print(f"Normalized output directory: {output_dir}")
-            
-            if not os.path.exists(output_dir):
-                print(f"Creating output directory: {output_dir}")
-                os.makedirs(output_dir, exist_ok=True)
-            
-            if not os.access(output_dir, os.W_OK):
-                return f"No write permission for output directory: {output_dir}", None
-            
-            # Create save folder path
-            save_folder = os.path.join(output_dir, channel_name)
-            print(f"Full save folder path: {save_folder}")
-        except Exception as e:
-            print(f"Error setting up output directory: {e}")
-            return f"Error setting up output directory: {e}", None
-    else:
-        save_folder = tempfile.mkdtemp()
-        print(f"Created temp directory: {save_folder}")
-
-    # Ensure save folder exists
-    try:
-        os.makedirs(save_folder, exist_ok=True)
-        if not os.path.exists(save_folder):
-            return f"Failed to create directory: {save_folder}", None
-        
-        if not os.access(save_folder, os.W_OK):
-            return f"No write permission for directory: {save_folder}", None
-    except OSError as e:
-        return f"Error creating directory '{save_folder}': {e}", None
-    except Exception as e:
-        return f"Error during directory creation setup '{save_folder}': {e}", None
-
-    # Create CSV file path
-    csv_filepath = os.path.join(save_folder, f"{channel_name}_video_list.csv")
-    
-    # Verify CSV file path is writable
-    try:
-        with open(csv_filepath, 'a') as f:
-            pass
-        os.remove(csv_filepath)
-    except OSError as e:
-        return f"Cannot write to file path '{csv_filepath}': {e}", None
-
-    import json  # ensure json is imported early
-
-    # --- Build yt-dlp command based on search_type ---
-    if search_type == "advanced":
-        # Step 1: Get flat playlist info to count videos
-        flat_command = [
-            'yt-dlp',
-            '--ignore-errors',
-            '--skip-download',
-            '--flat-playlist',
-            '--dump-single-json',
-            channel_url
-        ]
-        startupinfo = None
-        if sys.platform == "win32":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-
-        flat_result = subprocess.run(flat_command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-        entries = []
-        try:
-            flat_json = json.loads(flat_result.stdout)
-            entries = flat_json.get('entries', [])
-        except Exception:
-            entries = []
-
-        total_videos = len(entries)
-
-        if total_videos <= 100:
-            # Proceed with original single call
-            command = [
-                'yt-dlp',
-                '--ignore-errors',
-                '--skip-download',
-                '-J',
-                channel_url
-            ]
-            batch_mode = False
-        else:
-            # Batch mode
-            batch_mode = True
-            video_ids = [entry.get('id') for entry in entries if entry and 'id' in entry]
-            batches = [video_ids[i:i+100] for i in range(0, total_videos, 100)]
-
-            import concurrent.futures
-            all_video_entries = []
-
-            def fetch_batch(batch):
-                batch_urls = [f"https://www.youtube.com/watch?v={vid}" for vid in batch]
-                batch_command = [
-                    'yt-dlp',
-                    '--ignore-errors',
-                    '--skip-download',
-                    '-J'
-                ] + batch_urls
-
-                batch_result = subprocess.run(batch_command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-                try:
-                    batch_json = json.loads(batch_result.stdout)
-                    entries = []
-                    if isinstance(batch_json, dict) and 'entries' in batch_json:
-                        entries = batch_json['entries']
-                    elif isinstance(batch_json, list):
-                        entries = batch_json
-                    elif isinstance(batch_json, dict):
-                        entries = [batch_json]
-                    return entries
-                except Exception:
-                    return []
-
-            # Run batches in parallel
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [executor.submit(fetch_batch, batch) for batch in batches]
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        batch_entries = future.result()
-                        all_video_entries.extend(batch_entries)
-                    except Exception:
-                        continue
-
-            # Create a fake playlist_json to reuse existing parsing logic
-            playlist_json = {
-                'entries': all_video_entries,
-                'id': flat_json.get('id'),
-                'title': flat_json.get('title'),
-                'uploader': flat_json.get('uploader'),
-                'uploader_id': flat_json.get('uploader_id'),
-                'webpage_url': channel_url
-            }
-    else: # Basic search
-        # Build --print format only for allowed basic fields
-        print_format = ";".join(EXPORT_FIELD_MAP[field] for field in export_fields if field in BASIC_FIELDS)
-        command = [
-            'yt-dlp',
-            '--ignore-errors',
-            '--skip-download',
-            '--flat-playlist', # Use flat playlist for speed
-            '--print', print_format,
-            channel_url
-        ]
-        batch_mode = False
-    # --- End command building ---
-
-    try:
-        startupinfo = None
-        if sys.platform == "win32":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-
-        video_data = []
-        json_keys_map = {
-            "Title": "title",
-            "URL": "webpage_url",
-            "ID": "id",
-            "Description": "description",
-            "Published Date": "upload_date",
-            "Duration": "duration_string",
-            "Views": "view_count",
-            "Likes": "like_count",
-            "Comments": "comment_count",
-            "Thumbnail URL": "thumbnail"
-        }
-
-        if search_type == "advanced":
-            if not batch_mode:
-                result = subprocess.run(command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-                if result.returncode != 0:
-                    print(f"Warning: yt-dlp exited with code {result.returncode}")
-                    print(f"yt-dlp stderr: {result.stderr}")
-
-                if not result.stdout and result.stderr:
-                    return f"Error: yt-dlp failed.\nstderr: {result.stderr}", None
-                elif not result.stdout:
-                    return f"Error: yt-dlp produced no output. Check channel URL and yt-dlp installation. Stderr: {result.stderr}", None
-
-                try:
-                    playlist_json = json.loads(result.stdout)
-                except json.JSONDecodeError as e:
-                    print(f"Error: Failed to decode JSON output from yt-dlp (Advanced): {e}. Output: '{result.stdout[:200]}...'")
-                    return f"Error: Failed to parse yt-dlp output as JSON. Stderr: {result.stderr}", None
-                except Exception as e:
-                    print(f"Error processing JSON data (Advanced): {e}")
-                    return f"Error processing yt-dlp JSON data: {e}", None
-            # else: batch_mode already has playlist_json prepared
-
-            try:
-                if 'entries' in playlist_json and isinstance(playlist_json['entries'], list):
-                    for video_json in playlist_json['entries']:
-                        if not video_json:
-                            continue
-                        row_data = {}
-                        for field_name in export_fields:
-                            json_key = json_keys_map.get(field_name)
-                            row_data[field_name] = video_json.get(json_key, '') if json_key else ''
-                        video_data.append(row_data)
-                elif isinstance(playlist_json, dict):
-                    row_data = {}
-                    for field_name in export_fields:
-                        json_key = json_keys_map.get(field_name)
-                        row_data[field_name] = playlist_json.get(json_key, '') if json_key else ''
-                    video_data.append(row_data)
-                else:
-                    print(f"Warning: Unexpected JSON structure from yt-dlp (Advanced).")
-            except Exception as e:
-                print(f"Error processing JSON data (Advanced): {e}")
-                return f"Error processing yt-dlp JSON data: {e}", None
-
-        else:
-            # Basic search: run yt-dlp and parse plain text output
-            result = subprocess.run(command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-            if result.returncode != 0:
-                print(f"Warning: yt-dlp exited with code {result.returncode}")
-                print(f"yt-dlp stderr: {result.stderr}")
-
-            if not result.stdout and result.stderr:
-                return f"Error: yt-dlp failed.\nstderr: {result.stderr}", None
-            elif not result.stdout:
-                return f"Error: yt-dlp produced no output. Check channel URL and yt-dlp installation. Stderr: {result.stderr}", None
-
-            output_lines = result.stdout.strip().split('\n')
-            current_export_fields = [field for field in export_fields if field in BASIC_FIELDS]
-            for line in output_lines:
-                line = line.strip()
-                if not line:
-                    continue
-                parts = line.split(';')
-                if len(parts) == len(current_export_fields):
-                    video_data.append(dict(zip(current_export_fields, parts)))
-                else:
-                    print(f"Warning: Skipping line due to unexpected number of parts (Basic). Expected {len(current_export_fields)}, got {len(parts)}. Line: '{line[:100]}...'")
-
-        if not video_data:
-            stderr_info = ""
-            if search_type == "advanced" and not batch_mode and 'result' in locals():
-                stderr_info = f"\nstderr: {result.stderr}" if result.stderr else ""
-            elif search_type == "basic" and 'result' in locals():
-                stderr_info = f"\nstderr: {result.stderr}" if result.stderr else ""
-            return f"Warning: No valid video data extracted. yt-dlp output might be empty or in an unexpected format.{stderr_info}", None
-
-        # Write data to CSV file
-        print(f"Writing CSV file to: {csv_filepath}")  # Debug log
-        os.makedirs(os.path.dirname(csv_filepath), exist_ok=True)  # Ensure directory exists
-
-        try:
-            with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=export_fields)
-                writer.writeheader()
-                writer.writerows(video_data)
-            
-            # Verify file was written successfully
-            if not os.path.exists(csv_filepath):
-                return f"Error: File was not created at '{csv_filepath}'", None
-            
-            if os.path.getsize(csv_filepath) == 0:
-                return f"Error: File was created but is empty at '{csv_filepath}'", None
-                
-            print(f"Successfully wrote {len(video_data)} rows to {csv_filepath}")  # Debug log
-            
-        except IOError as e:
-            print(f"IOError writing CSV: {e}")  # Debug log
-            return f"Error writing to CSV file '{csv_filepath}': {e}", None
-        except Exception as e:
-            print(f"Unexpected error writing CSV: {e}")  # Debug log
-            return f"An unexpected error occurred during CSV writing: {e}", None
-
-        if output_option == "save":
-            return f"Success! {len(video_data)} videos saved to: {csv_filepath}", csv_filepath
-        else:
-            # For download mode, return absolute path
-            abs_path = os.path.abspath(csv_filepath)
-            return f"Success! {len(video_data)} videos ready for download.", abs_path
-
-    except FileNotFoundError:
-        return "Error: 'yt-dlp' command not found. Make sure yt-dlp is installed and in your system's PATH.", None
-    except subprocess.CalledProcessError as e:
-        return f"Error executing yt-dlp: {e}\nstderr: {e.stderr}", None
-    except Exception as e:
-        import traceback
-        print(f"Unexpected error during subprocess execution: {traceback.format_exc()}")
-        return f"An unexpected error occurred during processing: {e}", None
-
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
 
-@app.route('/get_video_ids', methods=['POST'])
-def get_video_ids():
-    data = request.get_json()
-    channel_url = data.get('channel_url')
-
-    if not channel_url:
-        return jsonify({'error': 'Missing channel_url'}), 400
-
-    flat_command = [
-        'yt-dlp',
-        '--ignore-errors',
-        '--skip-download',
-        '--flat-playlist',
-        '--dump-single-json',
-        channel_url
-    ]
-
-    startupinfo = None
-    if sys.platform == "win32":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-
-    try:
-        result = subprocess.run(flat_command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-        if result.returncode != 0:
-            return jsonify({'error': f'yt-dlp failed: {result.stderr}'}), 500
-
-        import json
-        flat_json = json.loads(result.stdout)
-        entries = flat_json.get('entries', [])
-        video_ids = [entry.get('id') for entry in entries if entry and 'id' in entry]
-
-        return jsonify({'video_ids': video_ids})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/get_video_metadata', methods=['POST'])
-def get_video_metadata():
-    data = request.get_json()
-    video_ids = data.get('video_ids', [])
-    export_fields = data.get('export_fields', ["Title", "URL"])
-
-    if not video_ids or not isinstance(video_ids, list):
-        return jsonify({'error': 'Missing or invalid video_ids'}), 400
-
-    # Build URLs
-    urls = [f"https://www.youtube.com/watch?v={vid}" for vid in video_ids]
-
-    command = [
-        'yt-dlp',
-        '--ignore-errors',
-        '--skip-download',
-        '-J'
-    ] + urls
-
-    startupinfo = None
-    if sys.platform == "win32":
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-        import json
-        try:
-            batch_json = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            # If no output at all, treat as empty batch
-            if not result.stdout.strip():
-                return jsonify({'videos': []})
-            # If parsing fails, but stderr contains known errors, treat as empty batch
-            if "Video unavailable" in result.stderr or "This video is private" in result.stderr:
-                return jsonify({'videos': []})
-            # Otherwise, return error with raw output for debugging
-            return jsonify({'error': f'Failed to parse yt-dlp output.\nstdout: {result.stdout}\nstderr: {result.stderr}'}), 500
-
-        json_keys_map = {
-            "Title": "title",
-            "URL": "webpage_url",
-            "ID": "id",
-            "Description": "description",
-            "Published Date": "upload_date",
-            "Duration": "duration_string",
-            "Views": "view_count",
-            "Likes": "like_count",
-            "Comments": "comment_count",
-            "Thumbnail URL": "thumbnail"
-        }
-
-        video_data = []
-
-        if isinstance(batch_json, dict) and 'entries' in batch_json:
-            entries = batch_json['entries']
-        elif isinstance(batch_json, list):
-            entries = batch_json
-        elif isinstance(batch_json, dict):
-            entries = [batch_json]
-        else:
-            entries = []
-
-        for video_json in entries:
-            if not video_json:
-                continue
-            row_data = {}
-            for field_name in export_fields:
-                json_key = json_keys_map.get(field_name)
-                row_data[field_name] = video_json.get(json_key, '') if json_key else ''
-            video_data.append(row_data)
-
-        return jsonify({'videos': video_data})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
-
-@app.route('/get_metadata_api', methods=['POST'])
-def get_metadata_api():
-    data = request.get_json()
-    video_ids = data.get('video_ids', [])
-    export_fields = data.get('export_fields', ["Title", "URL"])
-    fetch_method = data.get('fetch_method', 'youtube-api')
-    api_key = data.get('api_key') or os.getenv("YOUTUBE_API_KEY", "")
-
-    if not video_ids or not isinstance(video_ids, list):
-        return jsonify({'error': 'Missing or invalid video_ids'}), 400
-
-    if fetch_method == 'yt-dlp':
-        # Use yt-dlp fallback
-        urls = [f"https://www.youtube.com/watch?v={vid}" for vid in video_ids]
-        command = [
-            'yt-dlp',
-            '--ignore-errors',
-            '--skip-download',
-            '-J'
-        ] + urls
-
-        startupinfo = None
-        if sys.platform == "win32":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-
-        try:
-            result = subprocess.run(command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
-
-            import json
-            try:
-                batch_json = json.loads(result.stdout)
-            except json.JSONDecodeError:
-                return jsonify({'videos': []})
-
-            json_keys_map = {
-                "Title": "title",
-                "URL": "webpage_url",
-                "ID": "id",
-                "Description": "description",
-                "Published Date": "upload_date",
-                "Duration": "duration_string",
-                "Views": "view_count",
-                "Likes": "like_count",
-                "Comments": "comment_count",
-                "Thumbnail URL": "thumbnail"
-            }
-
-            video_data = []
-
-            if isinstance(batch_json, dict) and 'entries' in batch_json:
-                entries = batch_json['entries']
-            elif isinstance(batch_json, list):
-                entries = batch_json
-            elif isinstance(batch_json, dict):
-                entries = [batch_json]
-            else:
-                entries = []
-
-            for video_json in entries:
-                if not video_json:
-                    continue
-                row_data = {}
-                for field_name in export_fields:
-                    json_key = json_keys_map.get(field_name)
-                    row_data[field_name] = video_json.get(json_key, '') if json_key else ''
-                video_data.append(row_data)
-
-            return jsonify({'videos': video_data})
-
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-    # Else, use YouTube API
-    # Process videos in smaller batches
-    BATCH_SIZE = 10
-    videos = []
-    
-    try:
-        for i in range(0, len(video_ids), BATCH_SIZE):
-            batch = video_ids[i:i + BATCH_SIZE]
-            ids_str = ",".join(batch)
-            
-            url = "https://www.googleapis.com/youtube/v3/videos"
-            params = {
-                "part": "snippet,contentDetails,statistics",
-                "id": ids_str,
-                "key": api_key
-            }
-
-            try:
-                if not api_key:
-                    return jsonify({'error': 'Missing YouTube API key. Please check your environment variables.'}), 400
-
-                resp = requests.get(url, params=params, timeout=10)
-                resp.raise_for_status()
-                data = resp.json()
-                
-                if 'error' in data:
-                    error_msg = data['error'].get('message', 'Unknown error')
-                    error_code = data['error'].get('code', 'unknown')
-                    if error_code == 403:
-                        print(f"YouTube API Quota Exceeded or Access Denied: {error_msg}")
-                        return jsonify({'error': f"YouTube API Error: {error_msg}. Please check your quota limits and API key permissions."}), 403
-                    else:
-                        print(f"YouTube API Error ({error_code}): {error_msg}")
-                        continue
-
-                # Process each video in the batch
-                for item in data.get("items", []):
-                    snippet = item.get("snippet", {})
-                    stats = item.get("statistics", {})
-                    content = item.get("contentDetails", {})
-                    video = {}
-
-                    import isodate
-
-                    for field in export_fields:
-                        if field == "Title":
-                            video[field] = snippet.get("title", "")
-                        elif field == "URL":
-                            video[field] = f"https://www.youtube.com/watch?v={item.get('id','')}"
-                        elif field == "ID":
-                            video[field] = item.get("id", "")
-                        elif field == "Description":
-                            video[field] = snippet.get("description", "")
-                        elif field == "Published Date":
-                            video[field] = snippet.get("publishedAt", "")
-                        elif field == "Duration":
-                            iso_duration = content.get("duration", "")
-                            try:
-                                duration_seconds = int(isodate.parse_duration(iso_duration).total_seconds())
-                                hours = duration_seconds // 3600
-                                minutes = (duration_seconds % 3600) // 60
-                                seconds = duration_seconds % 60
-                                if hours > 0:
-                                    video[field] = f"{hours}:{minutes:02}:{seconds:02}"
-                                else:
-                                    video[field] = f"{minutes}:{seconds:02}"
-                            except:
-                                video[field] = iso_duration
-                        elif field == "Views":
-                            video[field] = stats.get("viewCount", "")
-                        elif field == "Likes":
-                            video[field] = stats.get("likeCount", "")
-                        elif field == "Comments":
-                            video[field] = stats.get("commentCount", "")
-                        elif field == "Thumbnail URL":
-                            thumbs = snippet.get("thumbnails", {})
-                            video[field] = thumbs.get("high", {}).get("url", "")
-                        else:
-                            video[field] = ""
-                    videos.append(video)
-
-            except requests.RequestException as e:
-                print(f"Error fetching batch {i//BATCH_SIZE + 1}: {str(e)}")
-                continue
-
-        return jsonify({'videos': videos})
-
-    except Exception as e:
-        return jsonify({'error': f"API Error: {str(e)} - Please check your YouTube API key and quota limits"}), 500
-
-
-@app.route('/download', methods=['POST'])
-def download():
-    data = request.get_json()
-    channel_url = data.get('channel_url')
-    output_dir = data.get('output_dir')
-    output_option = data.get('output_option', 'save')
-    export_fields = data.get('export_fields', ["Title", "URL"])
-    search_type = data.get('search_type', 'advanced')
-
-    print(f"Download request: option={output_option}, dir={output_dir}")  # Debug log
-
-    message, csv_path = get_videos_and_save(channel_url, output_dir, output_option, export_fields, search_type)
-    print(f"get_videos_and_save returned: message={message}, path={csv_path}")  # Debug log
-
-    if not message.startswith("Success"):
-        return jsonify({'message': message}), 400
-
-    # Always return the path for both save and download modes
-    if csv_path and os.path.exists(csv_path):
-        abs_path = os.path.abspath(csv_path)
-        return jsonify({
-            'message': message,
-            'csv_path': abs_path
-        })
-    else:
-        error_msg = f"File not found at expected location: {csv_path}"
-        print(error_msg)  # Debug log
-        return jsonify({'message': error_msg}), 500
-
-@app.route('/select_folder', methods=['GET'])
-def select_folder():
-    import tkinter as tk
-    from tkinter import filedialog
-    try:
-        # Initialize Tkinter without showing window
-        root = tk.Tk()
-        root.withdraw()
-        
-        # Ensure window stays hidden and appears on top
-        root.attributes('-topmost', True)
-        
-        if sys.platform == "win32":
-            import win32gui
-            import win32con
-            # Additional Windows-specific handling
-            # Get the Windows handle of the Tkinter window
-            hwnd = win32gui.GetForegroundWindow()
-            # Move window off screen
-            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-            # Fix focus issues on Windows
-            root.wm_attributes('-topmost', 1)
-            root.focus_force()
-        
-        # Show folder selection dialog with initial directory
-        initial_dir = os.path.expanduser("~")
-        folder_path = filedialog.askdirectory(
-            title="Select Output Folder",
-            parent=root,
-            initialdir=initial_dir
-        )
-        
-        # Clean up Tkinter
-        root.quit()
-        root.destroy()
-        
-        # Convert path to proper format for OS
-        if folder_path:
-            folder_path = os.path.normpath(folder_path)
-            return jsonify({'path': folder_path})
-        return jsonify({'path': ''})
-        
-    except Exception as e:
-        print(f"Error opening folder dialog: {str(e)}")
-        error_msg = str(e)
-        if "win32gui" in error_msg:
-            # Fallback if win32gui is not available
-            return select_folder_fallback()
-        return jsonify({'error': 'Failed to open folder selection dialog', 'details': error_msg}), 500
-
-def select_folder_fallback():
-    """Fallback method for folder selection when win32gui is not available"""
-    import tkinter as tk
-    from tkinter import filedialog
-    try:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        initial_dir = os.path.expanduser("~")
-        folder_path = filedialog.askdirectory(
-            title="Select Output Folder",
-            initialdir=initial_dir
-        )
-        root.destroy()
-        if folder_path:
-            return jsonify({'path': os.path.normpath(folder_path)})
-        return jsonify({'path': ''})
-    except Exception as e:
-        return jsonify({'error': 'Folder selection failed', 'details': str(e)}), 500
-
-from flask import send_file, request as flask_request
-
 @app.route('/download_csv')
 def download_csv():
-    csv_path = flask_request.args.get('path')
+    csv_path = request.args.get('path')
     print(f"Download request for file: {csv_path}")  # Debug log
 
     if not csv_path:
@@ -803,5 +92,409 @@ def download_csv():
         print(f"Error sending file: {e}")  # Debug log
         return f"Error sending file: {e}", 500
 
+@app.route('/select_folder', methods=['GET'])
+def select_folder():
+    import tkinter as tk
+    from tkinter import filedialog
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        initial_dir = os.path.expanduser("~")
+        folder_path = filedialog.askdirectory(
+            title="Select Output Folder",
+            initialdir=initial_dir
+        )
+        root.destroy()
+        if folder_path:
+            return jsonify({'path': os.path.normpath(folder_path)})
+        return jsonify({'path': ''})
+    except Exception as e:
+        return jsonify({'error': 'Folder selection failed', 'details': str(e)}), 500
+
+# Mapping from user-friendly field names to YouTube API parts and paths
+API_FIELD_MAP = {
+    "Title": {"part": "snippet", "path": "snippet.title"},
+    "URL": {"part": "id", "path": "id", "transform": lambda vid: f"https://www.youtube.com/watch?v={vid}"},
+    "ID": {"part": "id", "path": "id"},
+    "Description": {"part": "snippet", "path": "snippet.description"},
+    "Published Date": {"part": "snippet", "path": "snippet.publishedAt", "transform": lambda dt: dt.split('T')[0] if dt else ''}, # Extract date part
+    "Duration": {"part": "contentDetails", "path": "contentDetails.duration", "transform": lambda pd: isoduration_to_string(pd)}, # Convert ISO 8601 duration
+    "Views": {"part": "statistics", "path": "statistics.viewCount"},
+    "Likes": {"part": "statistics", "path": "statistics.likeCount"},
+    "Comments": {"part": "statistics", "path": "statistics.commentCount"},
+    "Thumbnail URL": {"part": "snippet", "path": "snippet.thumbnails.high.url"} # Or default/medium
+}
+
+# Helper to convert ISO 8601 duration (e.g., PT1M30S) to H:MM:SS or MM:SS
+def isoduration_to_string(duration_iso):
+    if not duration_iso or not duration_iso.startswith('PT'):
+        return ''
+    
+    duration_iso = duration_iso[2:] # Remove PT
+    hours, minutes, seconds = 0, 0, 0
+    
+    if 'H' in duration_iso:
+        parts = duration_iso.split('H')
+        hours = int(parts[0])
+        duration_iso = parts[1]
+    if 'M' in duration_iso:
+        parts = duration_iso.split('M')
+        minutes = int(parts[0])
+        duration_iso = parts[1]
+    if 'S' in duration_iso:
+        seconds = int(duration_iso.replace('S', ''))
+
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    else:
+        return f"{minutes:02d}:{seconds:02d}"
+
+# Helper to get nested dictionary value
+def get_nested_value(data_dict, path_string):
+    keys = path_string.split('.')
+    value = data_dict
+    try:
+        for key in keys:
+            if isinstance(value, dict):
+                value = value.get(key)
+            else:
+                return None # Path broken
+        return value
+    except Exception:
+        return None
+
+
+def get_videos_and_save(channel_url, output_dir, output_option, export_fields, search_type="advanced", api_key=""):
+    if not channel_url:
+        return "Error: Please provide a Channel URL.", None
+
+    if output_option == "save" and not output_dir:
+        return "Error: Please provide an Output Directory.", None
+
+    if not export_fields:
+        return "Error: Please select at least one export field.", None
+
+    if search_type == "basic":
+        invalid_fields = [field for field in export_fields if field not in BASIC_FIELDS]
+        # Basic search is deprecated when using API, as API always gives more fields
+        # We might re-introduce a simplified field selection later if needed.
+        pass # Keep all requested fields for API search
+
+    # Ensure API key is provided for advanced search
+    if not api_key:
+         return "Error: YouTube API Key is required for fetching video details.", None
+
+    channel_name = extract_channel_name(channel_url)
+    if not channel_name:
+        # Try a default name if extraction fails but URL might still work for yt-dlp
+        channel_name = "youtube_channel"
+        print(f"Warning: Could not extract channel name from URL: {channel_url}. Using default name '{channel_name}'.")
+        # return f"Error: Could not extract a usable channel name from the URL: {channel_url}", None
+
+    if output_option == "save":
+        try:
+            output_dir = os.path.normpath(output_dir)
+            if not os.path.isabs(output_dir):
+                output_dir = os.path.abspath(output_dir)
+            
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+            
+                return f"Error: No write permission for output directory: {output_dir}", None
+
+            save_folder = os.path.join(output_dir, channel_name)
+            # Ensure save folder exists
+            try:
+                os.makedirs(save_folder, exist_ok=True)
+                if not os.access(save_folder, os.W_OK):
+                    return f"Error: No write permission for directory: {save_folder}", None
+            except Exception as e:
+                return f"Error creating directory '{save_folder}': {e}", None
+
+        except Exception as e: # This except belongs to the outer try block starting at line 189
+            return f"Error setting up output directory: {e}", None
+    else: # download option
+        try:
+            save_folder = tempfile.mkdtemp()
+        except Exception as e:
+            return f"Error creating temporary directory: {e}", None
+
+
+    # Create CSV file path (moved outside the try/except for directory setup)
+    try:
+        csv_filepath = os.path.join(save_folder, f"{channel_name}_video_list.csv")
+    except Exception as e:
+         # Handle potential errors if save_folder wasn't created properly
+         return f"Error defining CSV file path: {e}", None
+
+    # --- Step 1: Get Video IDs using yt-dlp (flat list) ---
+    id_command = [
+        'yt-dlp',
+        '--ignore-errors',
+        '--skip-download',
+        '--flat-playlist',
+        '--print', '%(id)s', # Print only video IDs
+        channel_url
+    ]
+    video_ids = []
+    try:
+        startupinfo = None
+        if sys.platform == "win32":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            # startupinfo.wShowWindow = subprocess.SW_HIDE # Keep visible for debugging if needed
+
+        print(f"Running yt-dlp to get video IDs: {' '.join(id_command)}") # Debug log
+        result = subprocess.run(id_command, capture_output=True, text=True, encoding='utf-8', errors='ignore', startupinfo=startupinfo, check=False) # check=False allows us to see stderr
+
+        if result.returncode != 0:
+             # Check stderr for the specific bot error, even if IDs were partially extracted
+            if "Sign in to confirm" in result.stderr:
+                 print(f"Warning: yt-dlp encountered 'Sign in' error but might have extracted some IDs. Stderr: {result.stderr}")
+                 # Proceed if some IDs were found, otherwise fail
+            elif result.stderr:
+                 print(f"Warning: yt-dlp command for IDs finished with errors. Stderr: {result.stderr}")
+                 # Proceed if some IDs were found, otherwise fail
+
+        if result.stdout:
+            video_ids = result.stdout.strip().split('\n')
+            video_ids = [vid for vid in video_ids if vid] # Remove empty lines
+            print(f"Found {len(video_ids)} video IDs via yt-dlp.")
+        
+        if not video_ids:
+             # If no IDs found AND there was an error, report it
+             if result.returncode != 0 and result.stderr:
+                 return f"Error: yt-dlp failed to retrieve video IDs. Stderr: {result.stderr}", None
+             else:
+                 return f"Error: No video IDs found for the given URL using yt-dlp.", None
+
+    except Exception as e:
+        return f"Error running yt-dlp to get video IDs: {str(e)}", None
+
+    # --- Step 2: Fetch Metadata using YouTube Data API v3 ---
+    video_data = []
+    BATCH_SIZE = 50 # API limit per request
+    
+    # Determine required API parts based on selected fields
+    required_parts = set(['id']) # ID is always needed for URL construction if requested
+    for field in export_fields:
+        if field in API_FIELD_MAP:
+            required_parts.add(API_FIELD_MAP[field]['part'])
+    parts_str = ",".join(list(required_parts))
+
+    print(f"Fetching metadata for {len(video_ids)} videos using API parts: {parts_str}")
+
+    try:
+        for i in range(0, len(video_ids), BATCH_SIZE):
+            batch_ids = video_ids[i:i + BATCH_SIZE]
+            ids_str = ",".join(batch_ids)
+            
+            api_url = "https://www.googleapis.com/youtube/v3/videos"
+            params = {
+                "part": parts_str,
+                "id": ids_str,
+                "key": api_key,
+                "maxResults": BATCH_SIZE
+            }
+
+            print(f"Calling YouTube API for batch {i//BATCH_SIZE + 1}...") # Debug log
+            resp = requests.get(api_url, params=params, timeout=20) # Increased timeout
+            resp.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            api_data = resp.json()
+
+            if 'error' in api_data:
+                error_details = api_data['error']
+                # Check for specific quota error
+                if error_details.get('errors') and any(e.get('reason') == 'quotaExceeded' for e in error_details['errors']):
+                     return f"Error: YouTube API Quota Exceeded. Please check your Google Cloud Console.", None
+                else:
+                    error_msg = error_details.get('message', 'Unknown API error')
+                    return f"Error: YouTube API Error: {error_msg}", None
+
+            if 'items' not in api_data:
+                 print(f"Warning: API response for batch {i//BATCH_SIZE + 1} missing 'items'. Response: {api_data}")
+                 continue # Skip this batch if no items found
+
+            for item in api_data.get('items', []):
+                row = {}
+                for field in export_fields:
+                    if field in API_FIELD_MAP:
+                        map_info = API_FIELD_MAP[field]
+                        raw_value = get_nested_value(item, map_info['path'])
+                        
+                        # Apply transformation if defined (e.g., for URL, Duration, Date)
+                        if 'transform' in map_info:
+                            row[field] = map_info['transform'](raw_value) if raw_value is not None else ''
+                        else:
+                            row[field] = raw_value if raw_value is not None else ''
+                    else:
+                        row[field] = '' # Field not supported by API or map
+                video_data.append(row)
+        
+        print(f"Successfully fetched metadata for {len(video_data)} videos via API.")
+
+    except requests.exceptions.RequestException as e:
+        return f"Error calling YouTube API: {str(e)}", None
+    except Exception as e:
+        # Catch other potential errors during API processing
+        import traceback
+        print(f"Unexpected error during API processing: {traceback.format_exc()}")
+        return f"Error processing API response: {str(e)}", None
+
+    # --- Step 3: Write to CSV ---
+    if not video_data:
+        return "Warning: No video metadata could be fetched using the API, although IDs were found. The CSV file will be empty or contain only headers.", None
+
+    try:
+        print(f"Writing {len(video_data)} rows to CSV: {csv_filepath}")
+        with open(csv_filepath, 'w', newline='', encoding='utf-8') as f:
+            # Ensure fieldnames match the requested export_fields order
+            writer = csv.DictWriter(f, fieldnames=export_fields, extrasaction='ignore')
+            writer.writeheader()
+            writer.writerows(video_data)
+    except Exception as e:
+        return f"Error writing CSV file: {e}", None
+
+    # --- Step 4: Return result ---
+    if output_option == "save":
+        return f"Success! {len(video_data)} videos saved to: {csv_filepath}", csv_filepath
+    else: # download option
+        abs_path = os.path.abspath(csv_filepath)
+        return f"Success! {len(video_data)} videos ready for download.", abs_path
+
+# Removed the misplaced 'except Exception as e:' block from here, as errors are handled within steps
+
+@app.route('/get_video_ids', methods=['POST'])
+def get_video_ids():
+    data = request.get_json()
+    channel_url = data.get('channel_url')
+
+    if not channel_url:
+        return jsonify({'error': 'Missing channel_url'}), 400
+
+    command = [
+        'yt-dlp',
+        '--ignore-errors',
+        '--skip-download',
+        '--flat-playlist',
+        '--dump-single-json',
+        channel_url
+    ]
+
+    try:
+        startupinfo = None
+        if sys.platform == "win32":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', startupinfo=startupinfo)
+        data = json.loads(result.stdout)
+        videos = data.get('entries', [])
+        video_ids = [v.get('id') for v in videos if v and 'id' in v]
+        
+        return jsonify({'video_ids': video_ids})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
+
+@app.route('/get_metadata_api', methods=['POST'])
+def get_metadata_api():
+    data = request.get_json()
+    video_ids = data.get('video_ids', [])
+    export_fields = data.get('export_fields', ["Title", "URL"])
+    # Assign api_key here, ensuring it's available for the API path
+    api_key = data.get('api_key') or os.getenv("YOUTUBE_API_KEY", "")
+
+    if not video_ids or not isinstance(video_ids, list):
+        return jsonify({'error': 'Missing or invalid video_ids'}), 400
+
+    # Use YouTube API (yt-dlp fallback removed)
+    if not api_key:
+        return jsonify({'error': 'Missing YouTube API key'}), 400
+
+    videos = []
+    BATCH_SIZE = 10
+    
+    try:
+        for i in range(0, len(video_ids), BATCH_SIZE):
+            batch = video_ids[i:i + BATCH_SIZE]
+            ids_str = ",".join(batch)
+            
+            url = "https://www.googleapis.com/youtube/v3/videos"
+            params = {
+                "part": "snippet,contentDetails,statistics",
+                "id": ids_str,
+                "key": api_key
+            }
+
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if 'error' in data:
+                error_msg = data['error'].get('message', 'Unknown error')
+                return jsonify({'error': f"YouTube API Error: {error_msg}"}), 500
+
+            for item in data.get('items', []):
+                video = {}
+                for field in export_fields:
+                    if field == "Title":
+                        video[field] = item.get('snippet', {}).get('title', '')
+                    elif field == "URL":
+                        video[field] = f"https://www.youtube.com/watch?v={item.get('id','')}"
+                    elif field == "ID":
+                        video[field] = item.get('id', '')
+                    # Add other fields as needed
+                videos.append(video)
+
+        return jsonify({'videos': videos})
+
+    except requests.RequestException as e:
+        return jsonify({'error': f"API Error: {str(e)}"}), 500
+
+@app.route('/download', methods=['POST'])
+def download():
+    data = request.get_json()
+    channel_url = data.get('channel_url')
+    output_dir = data.get('output_dir')
+    output_option = data.get('output_option', 'save') # 'save' or 'download'
+    export_fields = data.get('export_fields', ["Title", "URL"]) # List of field names
+    # search_type = data.get('search_type', 'advanced') # No longer needed as we always use API
+    api_key = data.get('api_key') or os.getenv("YOUTUBE_API_KEY", "") # Get key from request or .env
+
+    print(f"Download request: channel='{channel_url}', option='{output_option}', fields={export_fields}, output_dir='{output_dir}'") # Debug log
+
+    # Call the refactored function, passing the API key
+    message, csv_path = get_videos_and_save(
+        channel_url=channel_url,
+        output_dir=output_dir,
+        output_option=output_option,
+        export_fields=export_fields,
+        api_key=api_key
+        # search_type is removed
+    )
+    print(f"get_videos_and_save returned: message='{message}', path='{csv_path}'") # Debug log
+
+    # Check for success or warning messages explicitly
+    if not message.startswith("Success") and not message.startswith("Warning"):
+        return jsonify({'message': message}), 400
+
+    if csv_path and os.path.exists(csv_path):
+        abs_path = os.path.abspath(csv_path)
+        return jsonify({
+            'message': message,
+            'csv_path': abs_path
+        })
+    else:
+        error_msg = f"File not found at expected location: {csv_path}"
+        print(error_msg)  # Debug log
+        return jsonify({'message': error_msg}), 500
+
+def run_server():
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    run_server()
