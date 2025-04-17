@@ -199,26 +199,42 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
                 output_dir = os.path.abspath(output_dir)
             
             if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-            
-                return f"Error: No write permission for output directory: {output_dir}", None
+                try:
+                    os.makedirs(output_dir, exist_ok=True)
+                    print(f"Successfully created directory: {output_dir}")
+                except Exception as e:
+                    error_message = f"Error creating output directory: {e}"
+                    print(error_message)
+                    return error_message, None
+            else:
+                print(f"Output directory already exists: {output_dir}")
 
             save_folder = os.path.join(output_dir, channel_name)
             # Ensure save folder exists
             try:
                 os.makedirs(save_folder, exist_ok=True)
+                print(f"Successfully created save folder: {save_folder}")
                 if not os.access(save_folder, os.W_OK):
-                    return f"Error: No write permission for directory: {save_folder}", None
+                    error_message = f"Error: No write permission for directory: {save_folder}"
+                    print(error_message)
+                    return error_message, None
             except Exception as e:
-                return f"Error creating directory '{save_folder}': {e}", None
+                error_message = f"Error creating directory '{save_folder}': {e}"
+                print(error_message)
+                return error_message, None
 
         except Exception as e: # This except belongs to the outer try block starting at line 189
-            return f"Error setting up output directory: {e}", None
+            error_message = f"Error setting up output directory: {e}"
+            print(error_message)
+            return error_message, None
     else: # download option
         try:
             save_folder = tempfile.mkdtemp()
+            print(f"Successfully created temporary directory: {save_folder}")
         except Exception as e:
-            return f"Error creating temporary directory: {e}", None
+            error_message = f"Error creating temporary directory: {e}"
+            print(error_message)
+            return error_message, None
 
 
     # Create CSV file path (moved outside the try/except for directory setup)
@@ -226,7 +242,9 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
         csv_filepath = os.path.join(save_folder, f"{channel_name}_video_list.csv")
     except Exception as e:
          # Handle potential errors if save_folder wasn't created properly
-         return f"Error defining CSV file path: {e}", None
+         error_message = f"Error defining CSV file path: {e}"
+         print(error_message)
+         return error_message, None
 
     # --- Step 1: Get Video IDs using yt-dlp (flat list) ---
     id_command = [

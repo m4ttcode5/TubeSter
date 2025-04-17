@@ -17,9 +17,19 @@ header {
   text-align: center;
   margin-bottom: 3rem;
   padding: 2rem 0;
+  height: 100px; /* Added height */
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   border-radius: 1rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  position: relative; /* Add relative positioning */
+}
+
+.logo {
+  /* Removed absolute positioning */
+  height: 40px; /* Adjusted height */
+  width: auto;
+  vertical-align: middle; /* Align with text */
+  margin-right: 10px; /* Add space between logo and text */
 }
 
 header h1 {
@@ -30,6 +40,15 @@ header h1 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Media query for mobile devices */
+@media (max-width: 768px) {
+  /* Removed logo adjustments here as it's now inline */
+
+  header h1 {
+    font-size: 2rem; /* Adjust font size for smaller screens */
+  }
 }
 
 .main-nav {
@@ -497,5 +516,27 @@ input[type="radio"] {
   
   .feature-intro, .cta-section {
     padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0 10px;
+  }
+
+  header h1 {
+    font-size: 2rem;
+  }
+
+  .feature-highlights {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  input[type="text"],
+  input[type="url"],
+  textarea {
+    padding: 8px;
+    font-size: 0.9rem;
   }
 }
