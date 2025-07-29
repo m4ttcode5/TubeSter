@@ -1,10 +1,52 @@
+/* Performance and Mobile Optimizations */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: #0f172a;
   color: #e2e8f0;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   margin: 0;
   padding: 0;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+/* Improve image loading performance */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Optimize focus states for accessibility */
+*:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #3b82f6;
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 6px;
 }
 
 .container {
@@ -17,19 +59,28 @@ header {
   text-align: center;
   margin-bottom: 3rem;
   padding: 2rem 0;
-  height: 100px; /* Added height */
+  height: auto;
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   border-radius: 1rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  position: relative; /* Add relative positioning */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .logo {
-  /* Removed absolute positioning */
-  height: 40px; /* Adjusted height */
+  height: 60px;
   width: auto;
-  vertical-align: middle; /* Align with text */
-  margin-right: 10px; /* Add space between logo and text */
+  margin-bottom: 1rem;
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 header h1 {
@@ -726,24 +777,109 @@ input[type="radio"] {
   }
 }
 
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 15px;
+    margin: 1rem auto;
+  }
+
+  header {
+    height: auto;
+    padding: 1.5rem 1rem;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    line-height: 1.2;
+  }
+
+  .main-nav {
+    margin-top: 1rem;
+  }
+
+  .feature-link {
+    display: block;
+    margin: 0.5rem 0;
+    text-align: center;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .export-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .output-dir-container {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .footer-content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .shop-categories {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
 @media (max-width: 480px) {
   .container {
     padding: 0 10px;
   }
 
   header h1 {
-    font-size: 2rem;
+    font-size: 1.75rem;
   }
 
   .feature-highlights {
     flex-direction: column;
     align-items: center;
+    gap: 0.5rem;
+  }
+
+  .highlight-badge {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
   }
 
   input[type="text"],
   input[type="url"],
+  input[type="password"],
   textarea {
-    padding: 8px;
-    font-size: 0.9rem;
+    padding: 10px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  button {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 1rem;
+  }
+
+  .product-card {
+    margin-bottom: 1rem;
+  }
+
+  .product-image {
+    height: 180px;
+  }
+
+  main {
+    padding: 1.5rem;
+  }
+
+  .intro-section {
+    padding: 1rem;
+  }
+
+  .donation-section {
+    padding: 1.5rem;
   }
 }
