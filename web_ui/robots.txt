@@ -20,9 +20,6 @@ Allow: /
 User-agent: DuckDuckBot
 Allow: /
 
-# Disallow unnecessary files
-Disallow: /*.js$
-Disallow: /*.css$
-Disallow: /logo/
+# Disallow sensitive or non-content paths (keep assets crawlable for SEO)
 Disallow: /.env
 Disallow: /mcp_servers/

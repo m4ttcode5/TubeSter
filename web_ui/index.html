@@ -19,50 +19,42 @@
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-      TubeSter.top - YouTube Channel Video List Downloader | Save Video URLs
-    </title>
+    <title>YouTube Channel Video List Downloader (CSV) | TubeSter.top</title>
     <meta
       name="description"
-      content="TubeSter.top - Download or save YouTube channel video URLs easily as CSV files. Choose to save to your folder or download directly. Fast, simple, privacy-friendly tool."
+      content="Download YouTube channel video lists as CSV in seconds. Fast, free, privacy-focused YouTube URL extractor with basic and advanced metadata export."
     />
-    <meta
-      name="keywords"
-      content="TubeSter.top, YouTube downloader, video URL extractor, save YouTube URLs, download CSV, YouTube channel videos, YouTube video list, YouTube scraper"
-    />
+    <meta name="keywords" content="YouTube channel video list downloader, YouTube URL extractor, download YouTube CSV, export YouTube metadata, free YouTube tools, YouTube SEO tools" />
     <meta name="author" content="TubeSter.top" />
-    <meta name="robots" content="index, follow" />
-    <meta
-      property="og:title"
-      content="TubeSter.top - YouTube Channel Video List Downloader"
-    />
-    <meta
-      property="og:description"
-      content="Download or save YouTube channel video URLs easily as CSV files. The fastest and most reliable YouTube video list tool."
-    />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta property="og:title" content="YouTube Channel Video List Downloader (CSV) | TubeSter.top" />
+    <meta property="og:description" content="Export YouTube channel video URLs and metadata as CSV. Fast, free, and privacy-focused." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.tubester.top" />
-    <meta property="og:image" content="https://www.tubester.top/logo.png" />
+    <meta property="og:url" content="https://www.tubester.top/" />
+    <meta property="og:image" content="https://www.tubester.top/logo/tubester_logo.png" />
+    <meta property="og:site_name" content="TubeSter.top" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="YouTube Channel Video List Downloader (CSV) | TubeSter.top" />
+    <meta name="twitter:description" content="Export YouTube channel video URLs and metadata as CSV. Fast, free, and privacy-focused." />
+    <meta name="twitter:image" content="https://www.tubester.top/logo/tubester_logo.png" />
     <link rel="canonical" href="https://www.tubester.top/" />
     <link rel="stylesheet" href="style.css" />
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
+      "@type": "Organization",
       "name": "TubeSter.top",
-      "description": "Professional YouTube channel video list downloader and URL extractor. Save video URLs as CSV files with metadata.",
-      "url": "https://www.tubester.top",
-      "applicationCategory": "Utility",
-      "operatingSystem": "Web Browser",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "creator": {
-        "@type": "Organization",
-        "name": "TubeSter.top"
-      }
+      "url": "https://www.tubester.top/",
+      "logo": "https://www.tubester.top/logo/tubester_logo.png",
+      "sameAs": []
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "TubeSter.top",
+      "url": "https://www.tubester.top/"
     }
     </script>
   </head>
@@ -71,7 +63,7 @@
     <div class="container">
       <header>
 <img src="logo/tubester_logo.png" alt="TubeSter.top Logo" class="logo" />
-        <h1>TubeSter.top - Video List Downloader</h1>
+        <h1>YouTube Channel Video List Downloader (CSV Export)</h1>
         <nav class="main-nav">
           <a href="features.html" class="feature-link" style="color: #ffdd00"
             >🔍 View Features & Capabilities</a
@@ -85,9 +77,8 @@
         <section class="intro-section">
           <h2>Extract YouTube Channel Videos</h2>
           <p>
-            Professional tool to download video lists from any YouTube channel.
-            Export metadata, organize content, and manage your video library
-            efficiently.
+            Use this free YouTube URL extractor to download a complete channel video list and
+            export CSV with titles, URLs, IDs and optional metadata. Ideal for audits, backups and SEO planning.
           </p>
           <div class="feature-highlights">
             <span class="highlight-badge">✨ Free to Use</span>
@@ -266,6 +257,25 @@
             Your support helps maintain and improve this free tool 💖
           </p>
         </div>
+        <section class="faq-section" aria-labelledby="faq-title">
+          <h2 id="faq-title">Frequently Asked Questions</h2>
+          <div class="faq">
+            <h3>What can I download with this YouTube video list tool?</h3>
+            <p>You can export a list of videos from any public YouTube channel including title, URL and ID. With Advanced Search you can also export description, publish date, duration, views, likes, comments and thumbnail URL.</p>
+          </div>
+          <div class="faq">
+            <h3>Is TubeSter.top free to use?</h3>
+            <p>Yes. The YouTube channel video list downloader is free and privacy-focused. Your data is processed for the requested export only.</p>
+          </div>
+          <div class="faq">
+            <h3>Do I need a YouTube API key?</h3>
+            <p>No for the default yt-dlp method. If you choose the YouTube Data API method, you can provide your own API key for quota-controlled fetching.</p>
+          </div>
+          <div class="faq">
+            <h3>Can I save the CSV directly to my computer?</h3>
+            <p>Yes. Choose “Download File” to save the CSV immediately, or “Save to Folder” to organize by channel.</p>
+          </div>
+        </section>
       </main>
       <footer style="font-size: 0.9rem; color: #94a3b8; margin-top: 3rem; text-align: center; padding: 2rem;">
         <p style="margin-bottom: 1rem;">
@@ -285,6 +295,46 @@
       </footer>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js" defer></script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What can I download with this YouTube video list tool?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can export a list of videos from any public YouTube channel including title, URL and ID. With Advanced Search you can also export description, publish date, duration, views, likes, comments and thumbnail URL."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is TubeSter.top free to use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The YouTube channel video list downloader is free and privacy-focused. Your data is processed for the requested export only."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need a YouTube API key?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No for the default yt-dlp method. If you choose the YouTube Data API method, you can provide your own API key for quota-controlled fetching."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I save the CSV directly to my computer?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Choose “Download File” to save the CSV immediately, or “Save to Folder” to organize by channel."
+          }
+        }
+      ]
+    }
+    </script>
   </body>
 </html>
