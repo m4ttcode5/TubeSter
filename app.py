@@ -61,6 +61,28 @@ def extract_channel_name(url):
     else:
         return None
 
+def normalize_channel_url(url):
+    """Ensure the YouTube channel URL has /videos suffix for yt-dlp compatibility"""
+    if not url:
+        return url
+
+    # Remove any trailing slash
+    url = url.rstrip('/')
+
+    # If it's already a video URL or has /videos, return as is
+    if '/watch?' in url or '/videos' in url:
+        return url
+
+    # For channel URLs, append /videos
+    if 'youtube.com/@' in url or 'youtube.com/c/' in url or 'youtube.com/user/' in url or 'youtube.com/channel/' in url:
+        return url + '/videos'
+
+    # For handle format (@username), convert to full URL with /videos
+    if url.startswith('@'):
+        return f'https://www.youtube.com/{url}/videos'
+
+    return url
+
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -165,6 +187,55 @@ def get_nested_value(data_dict, path_string):
         return None
 
 
+def get_metadata_yt_dlp(normalized_url, export_fields):
+    """Get video metadata using yt-dlp as fallback when API is not available or fails"""
+    command = [
+        'yt-dlp',
+        '--ignore-errors',
+        '--skip-download',
+        '--dump-single-json',
+        normalized_url
+    ]
+
+    try:
+        startupinfo = None
+        if sys.platform == "win32":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
+
+        if result.returncode != 0:
+            print(f"yt-dlp command failed: {result.stderr}")
+            return None
+
+        data = json.loads(result.stdout)
+        videos = data.get('entries', [])
+        video_data = []
+
+        for video in videos:
+            if not video or not isinstance(video, dict):
+                continue
+
+            row = {}
+            for field in export_fields:
+                if field in EXPORT_FIELD_MAP:
+                    format_str = EXPORT_FIELD_MAP[field]
+                    try:
+                        value = format_str % video
+                        row[field] = value
+                    except (KeyError, TypeError, ValueError):
+                        row[field] = ''
+                else:
+                    row[field] = ''
+            video_data.append(row)
+
+        return video_data
+
+    except Exception as e:
+        print(f"Error in get_metadata_yt_dlp: {str(e)}")
+        return None
+
 def get_videos_and_save(channel_url, output_dir, output_option, export_fields, search_type="advanced", api_key=""):
     if not channel_url:
         return "Error: Please provide a Channel URL.", None
@@ -181,9 +252,10 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
         # We might re-introduce a simplified field selection later if needed.
         pass # Keep all requested fields for API search
 
-    # Ensure API key is provided for advanced search
-    if not api_key:
-         return "Error: YouTube API Key is required for fetching video details.", None
+    # API key is optional; if not provided, will use yt-dlp for metadata
+
+    # Normalize the URL for better yt-dlp compatibility
+    normalized_url = normalize_channel_url(channel_url)
 
     channel_name = extract_channel_name(channel_url)
     if not channel_name:
@@ -253,7 +325,7 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
         '--skip-download',
         '--flat-playlist',
         '--print', '%(id)s', # Print only video IDs
-        channel_url
+        normalized_url
     ]
     video_ids = []
     try:
@@ -290,75 +362,114 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
     except Exception as e:
         return f"Error running yt-dlp to get video IDs: {str(e)}", None
 
-    # --- Step 2: Fetch Metadata using YouTube Data API v3 ---
+    # --- Step 2: Fetch Metadata ---
     video_data = []
-    BATCH_SIZE = 50 # API limit per request
-    
-    # Determine required API parts based on selected fields
-    required_parts = set(['id']) # ID is always needed for URL construction if requested
-    for field in export_fields:
-        if field in API_FIELD_MAP:
-            required_parts.add(API_FIELD_MAP[field]['part'])
-    parts_str = ",".join(list(required_parts))
 
-    print(f"Fetching metadata for {len(video_ids)} videos using API parts: {parts_str}")
+    if api_key:
+        # Try using YouTube Data API v3
+        BATCH_SIZE = 50 # API limit per request
 
-    try:
-        for i in range(0, len(video_ids), BATCH_SIZE):
-            batch_ids = video_ids[i:i + BATCH_SIZE]
-            ids_str = ",".join(batch_ids)
-            
-            api_url = "https://www.googleapis.com/youtube/v3/videos"
-            params = {
-                "part": parts_str,
-                "id": ids_str,
-                "key": api_key,
-                "maxResults": BATCH_SIZE
-            }
+        # Determine required API parts based on selected fields
+        required_parts = set(['id']) # ID is always needed for URL construction if requested
+        for field in export_fields:
+            if field in API_FIELD_MAP:
+                required_parts.add(API_FIELD_MAP[field]['part'])
+        parts_str = ",".join(list(required_parts))
 
-            print(f"Calling YouTube API for batch {i//BATCH_SIZE + 1}...") # Debug log
-            resp = requests.get(api_url, params=params, timeout=20) # Increased timeout
-            resp.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
-            api_data = resp.json()
+        print(f"Fetching metadata for {len(video_ids)} videos using API parts: {parts_str}")
 
-            if 'error' in api_data:
-                error_details = api_data['error']
-                # Check for specific quota error
-                if error_details.get('errors') and any(e.get('reason') == 'quotaExceeded' for e in error_details['errors']):
-                     return f"Error: YouTube API Quota Exceeded. Please check your Google Cloud Console.", None
-                else:
-                    error_msg = error_details.get('message', 'Unknown API error')
-                    return f"Error: YouTube API Error: {error_msg}", None
+        use_yt_dlp = False
+        try:
+            for i in range(0, len(video_ids), BATCH_SIZE):
+                batch_ids = video_ids[i:i + BATCH_SIZE]
+                ids_str = ",".join(batch_ids)
 
-            if 'items' not in api_data:
-                 print(f"Warning: API response for batch {i//BATCH_SIZE + 1} missing 'items'. Response: {api_data}")
-                 continue # Skip this batch if no items found
+                api_url = "https://www.googleapis.com/youtube/v3/videos"
+                params = {
+                    "part": parts_str,
+                    "id": ids_str,
+                    "key": api_key
+                }
 
-            for item in api_data.get('items', []):
-                row = {}
-                for field in export_fields:
-                    if field in API_FIELD_MAP:
-                        map_info = API_FIELD_MAP[field]
-                        raw_value = get_nested_value(item, map_info['path'])
-                        
-                        # Apply transformation if defined (e.g., for URL, Duration, Date)
-                        if 'transform' in map_info:
-                            row[field] = map_info['transform'](raw_value) if raw_value is not None else ''
-                        else:
-                            row[field] = raw_value if raw_value is not None else ''
+                print(f"Calling YouTube API for batch {i//BATCH_SIZE + 1}...") # Debug log
+                resp = requests.get(api_url, params=params, timeout=20) # Increased timeout
+                if resp.status_code == 400:
+                    try:
+                        api_data = resp.json()
+                        if 'error' in api_data:
+                            error_details = api_data['error']
+                            error_msg = error_details.get('message', 'Bad Request')
+                            if 'key' in error_msg.lower() or 'invalid' in error_msg.lower():
+                                print("API key invalid, falling back to yt-dlp")
+                                use_yt_dlp = True
+                                break
+                            else:
+                                return f"Error: YouTube API Error: {error_msg}", None
+                    except:
+                        pass
+                    return f"Error: Bad Request to YouTube API (status 400)", None
+                resp.raise_for_status() # Raise HTTPError for other bad responses
+                api_data = resp.json()
+
+                if 'error' in api_data:
+                    error_details = api_data['error']
+                    # Check for specific quota error
+                    if error_details.get('errors') and any(e.get('reason') == 'quotaExceeded' for e in error_details['errors']):
+                         return f"Error: YouTube API Quota Exceeded. Please check your Google Cloud Console.", None
                     else:
-                        row[field] = '' # Field not supported by API or map
-                video_data.append(row)
-        
-        print(f"Successfully fetched metadata for {len(video_data)} videos via API.")
+                        error_msg = error_details.get('message', 'Unknown API error')
+                        if 'key' in error_msg.lower() or 'invalid' in error_msg.lower():
+                            print("API key invalid, falling back to yt-dlp")
+                            use_yt_dlp = True
+                            break
+                        else:
+                            return f"Error: YouTube API Error: {error_msg}", None
 
-    except requests.exceptions.RequestException as e:
-        return f"Error calling YouTube API: {str(e)}", None
-    except Exception as e:
-        # Catch other potential errors during API processing
-        import traceback
-        print(f"Unexpected error during API processing: {traceback.format_exc()}")
-        return f"Error processing API response: {str(e)}", None
+                if 'items' not in api_data:
+                     print(f"Warning: API response for batch {i//BATCH_SIZE + 1} missing 'items'. Response: {api_data}")
+                     continue # Skip this batch if no items found
+
+                for item in api_data.get('items', []):
+                    row = {}
+                    for field in export_fields:
+                        if field in API_FIELD_MAP:
+                            map_info = API_FIELD_MAP[field]
+                            raw_value = get_nested_value(item, map_info['path'])
+
+                            # Apply transformation if defined (e.g., for URL, Duration, Date)
+                            if 'transform' in map_info:
+                                row[field] = map_info['transform'](raw_value) if raw_value is not None else ''
+                            else:
+                                row[field] = raw_value if raw_value is not None else ''
+                        else:
+                            row[field] = '' # Field not supported by API or map
+                    video_data.append(row)
+
+            if use_yt_dlp:
+                video_data = get_metadata_yt_dlp(normalized_url, export_fields)
+                if video_data is None:
+                    return "Error: Failed to get metadata from yt-dlp after API key error", None
+
+            print(f"Successfully fetched metadata for {len(video_data)} videos.")
+
+        except requests.exceptions.RequestException as e:
+            print(f"API request failed, falling back to yt-dlp: {str(e)}")
+            video_data = get_metadata_yt_dlp(normalized_url, export_fields)
+            if video_data is None:
+                return f"Error: Failed to get metadata from both API and yt-dlp: {str(e)}", None
+        except Exception as e:
+            # Catch other potential errors during API processing
+            import traceback
+            print(f"Unexpected error during API processing: {traceback.format_exc()}")
+            video_data = get_metadata_yt_dlp(normalized_url, export_fields)
+            if video_data is None:
+                return f"Error: Failed to get metadata from yt-dlp after API error: {str(e)}", None
+    else:
+        # No API key provided, use yt-dlp
+        print("No API key provided, using yt-dlp for metadata")
+        video_data = get_metadata_yt_dlp(normalized_url, export_fields)
+        if video_data is None:
+            return "Error: Failed to get metadata from yt-dlp", None
 
     # --- Step 3: Write to CSV ---
     if not video_data:
@@ -391,13 +502,16 @@ def get_video_ids():
     if not channel_url:
         return jsonify({'error': 'Missing channel_url'}), 400
 
+    # Normalize the URL to ensure /videos suffix for better yt-dlp compatibility
+    normalized_url = normalize_channel_url(channel_url)
+
     command = [
         'yt-dlp',
         '--ignore-errors',
         '--skip-download',
         '--flat-playlist',
         '--dump-single-json',
-        channel_url
+        normalized_url
     ]
 
     try:
@@ -433,7 +547,7 @@ def get_metadata_api():
         return jsonify({'error': 'Missing YouTube API key'}), 400
 
     videos = []
-    BATCH_SIZE = 10
+    BATCH_SIZE = 50  # YouTube API allows up to 50 IDs per request
     
     try:
         for i in range(0, len(video_ids), BATCH_SIZE):
@@ -448,6 +562,15 @@ def get_metadata_api():
             }
 
             resp = requests.get(url, params=params, timeout=10)
+            if resp.status_code == 400:
+                try:
+                    data = resp.json()
+                    if 'error' in data:
+                        error_msg = data['error'].get('message', 'Bad Request')
+                        return jsonify({'error': f"YouTube API Error: {error_msg}"}), 400
+                except:
+                    pass
+                return jsonify({'error': 'Bad Request to YouTube API'}), 400
             resp.raise_for_status()
             data = resp.json()
 
