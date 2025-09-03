@@ -61,6 +61,28 @@ def extract_channel_name(url):
     else:
         return None
 
+def normalize_channel_url(url):
+    """Ensure the YouTube channel URL has /videos suffix for yt-dlp compatibility"""
+    if not url:
+        return url
+
+    # Remove any trailing slash
+    url = url.rstrip('/')
+
+    # If it's already a video URL or has /videos, return as is
+    if '/watch?' in url or '/videos' in url:
+        return url
+
+    # For channel URLs, append /videos
+    if 'youtube.com/@' in url or 'youtube.com/c/' in url or 'youtube.com/user/' in url or 'youtube.com/channel/' in url:
+        return url + '/videos'
+
+    # For handle format (@username), convert to full URL with /videos
+    if url.startswith('@'):
+        return f'https://www.youtube.com/{url}/videos'
+
+    return url
+
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -183,7 +205,10 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
 
     # Ensure API key is provided for advanced search
     if not api_key:
-         return "Error: YouTube API Key is required for fetching video details.", None
+          return "Error: YouTube API Key is required for fetching video details.", None
+
+    # Normalize the URL for better yt-dlp compatibility
+    normalized_url = normalize_channel_url(channel_url)
 
     channel_name = extract_channel_name(channel_url)
     if not channel_name:
@@ -253,7 +278,7 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
         '--skip-download',
         '--flat-playlist',
         '--print', '%(id)s', # Print only video IDs
-        channel_url
+        normalized_url
     ]
     video_ids = []
     try:
@@ -312,13 +337,22 @@ def get_videos_and_save(channel_url, output_dir, output_option, export_fields, s
             params = {
                 "part": parts_str,
                 "id": ids_str,
-                "key": api_key,
-                "maxResults": BATCH_SIZE
+                "key": api_key
             }
 
             print(f"Calling YouTube API for batch {i//BATCH_SIZE + 1}...") # Debug log
             resp = requests.get(api_url, params=params, timeout=20) # Increased timeout
-            resp.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            if resp.status_code == 400:
+                try:
+                    api_data = resp.json()
+                    if 'error' in api_data:
+                        error_details = api_data['error']
+                        error_msg = error_details.get('message', 'Bad Request')
+                        return f"Error: YouTube API Error: {error_msg}", None
+                except:
+                    pass
+                return f"Error: Bad Request to YouTube API (status 400)", None
+            resp.raise_for_status() # Raise HTTPError for other bad responses
             api_data = resp.json()
 
             if 'error' in api_data:
@@ -391,13 +425,16 @@ def get_video_ids():
     if not channel_url:
         return jsonify({'error': 'Missing channel_url'}), 400
 
+    # Normalize the URL to ensure /videos suffix for better yt-dlp compatibility
+    normalized_url = normalize_channel_url(channel_url)
+
     command = [
         'yt-dlp',
         '--ignore-errors',
         '--skip-download',
         '--flat-playlist',
         '--dump-single-json',
-        channel_url
+        normalized_url
     ]
 
     try:
@@ -433,7 +470,7 @@ def get_metadata_api():
         return jsonify({'error': 'Missing YouTube API key'}), 400
 
     videos = []
-    BATCH_SIZE = 10
+    BATCH_SIZE = 50  # YouTube API allows up to 50 IDs per request
     
     try:
         for i in range(0, len(video_ids), BATCH_SIZE):
@@ -448,6 +485,15 @@ def get_metadata_api():
             }
 
             resp = requests.get(url, params=params, timeout=10)
+            if resp.status_code == 400:
+                try:
+                    data = resp.json()
+                    if 'error' in data:
+                        error_msg = data['error'].get('message', 'Bad Request')
+                        return jsonify({'error': f"YouTube API Error: {error_msg}"}), 400
+                except:
+                    pass
+                return jsonify({'error': 'Bad Request to YouTube API'}), 400
             resp.raise_for_status()
             data = resp.json()
 
