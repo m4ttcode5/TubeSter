@@ -116,23 +116,8 @@ def download_csv():
 
 @app.route('/select_folder', methods=['GET'])
 def select_folder():
-    import tkinter as tk
-    from tkinter import filedialog
-    try:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        initial_dir = os.path.expanduser("~")
-        folder_path = filedialog.askdirectory(
-            title="Select Output Folder",
-            initialdir=initial_dir
-        )
-        root.destroy()
-        if folder_path:
-            return jsonify({'path': os.path.normpath(folder_path)})
-        return jsonify({'path': ''})
-    except Exception as e:
-        return jsonify({'error': 'Folder selection failed', 'details': str(e)}), 500
+    """Return an error message since folder selection is not available in server environment"""
+    return jsonify({'error': 'Folder selection is not available in server environment. Please use the download option instead.'}), 400
 
 # Mapping from user-friendly field names to YouTube API parts and paths
 API_FIELD_MAP = {

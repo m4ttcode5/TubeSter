@@ -1,1 +1,1 @@
-web: waitress-serve --host 0.0.0.0 --port 5000 server:app
+web: waitress-serve --host 0.0.0.0 --port $PORT server:app
