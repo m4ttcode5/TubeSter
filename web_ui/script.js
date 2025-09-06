@@ -131,7 +131,8 @@ downloadBtn.addEventListener('click', async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           video_ids: batch,
-          export_fields: selectedFields
+          export_fields: selectedFields,
+          api_key: apiKeyInput.value.trim() || undefined
         })
       });
 
@@ -161,7 +162,8 @@ downloadBtn.addEventListener('click', async () => {
           output_dir: outputDir,
           output_option: outputOption,
           export_fields: selectedFields,
-          search_type: searchType
+          search_type: searchType,
+          api_key: apiKeyInput.value.trim() || undefined
         })
       });
 
