@@ -1,0 +1,55 @@
+{
+  "name": "TubeSter.top - YouTube Channel Video List Downloader",
+  "short_name": "TubeSter",
+  "description": "Download YouTube channel video lists as CSV. Fast, free, privacy-focused YouTube URL extractor with metadata export.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "any",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/tubester_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo/tubester_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities", "video"],
+  "screenshots": [
+    {
+      "src": "/tubester_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "TubeSter.top Main Interface"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Download CSV",
+      "short_name": "Download",
+      "description": "Quick access to video list downloader",
+      "url": "/",
+      "icons": [{ "src": "/tubester_logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Features",
+      "short_name": "Features",
+      "description": "View all features and capabilities",
+      "url": "/features.html",
+      "icons": [{ "src": "/tubester_logo.png", "sizes": "192x192" }]
+    }
+  ]
+}
