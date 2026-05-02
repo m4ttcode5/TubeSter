@@ -1,4 +1,4 @@
-https://amzn.to/3H3VTBu
+https://www.amazon.com/dp/B01LQQHL4E?tag=solarhub05-20
 https://m.media-amazon.com/images/I/61Ty6a9cRFS._AC_SL1500_.jpg
 Western Digital 4TB My Book Desktop External Hard Drive, USB 3.0, External HDD with Password Protection and Backup Software - WDBBGB0040HBK-NESN
 About this item
@@ -8,7 +8,7 @@ Includes software for device management and backup with password protection (Dow
 SuperSpeed USB (5 Gbps); USB 2.0 compatible
 Trusted storage built with WD reliability
 
-https://amzn.to/46yM35f
+https://www.amazon.com/dp/B07S5F4M3Q?tag=solarhub05-20
 https://m.media-amazon.com/images/I/61c2wJQNQZL._AC_SL1500_.jpg
 Logitech MX Keys S Combo - Performance Wireless Keyboard and Mouse with Palm Rest, Customizable Illumination, Fast Scrolling, Bluetooth, USB C, for Windows, Linux, Chrome, Mac
 About this item
@@ -20,7 +20,7 @@ Smarter Illumination: Backlit keyboard keys light up as your hands approach and 
 More Comfort, Deeper Focus: Mouse and keyboard engineered for hours of work; stable keyboard with an optimum angle, and mouse sculpted for your hand for better wrist posture
 Multi-Device, Multi OS Combo: Pair with up to 3 devices on nearly any operating system (Windows, macOS, Linux) via Bluetooth Low Energy or included Logi Bolt USB receiver (5)
 
-https://amzn.to/4o91TJQ
+https://www.amazon.com/dp/B0C9PCP19H?tag=solarhub05-20
 https://m.media-amazon.com/images/I/51g8SILAlnL._AC_SL1080_.jpg
 ErGear Dual Monitor Desk Mount up to 40 inches Screens, Max 26.4lbs Capacity Each, Heavy Duty Ultrawide Monitor Arm with USB Ports, Height Adjustable Monitor Stand, VESA 75x75mm or 100x100mm, Black
 About this item
@@ -31,7 +31,7 @@ Easy to Assemble: Our dual monitor stand is easy to install thanks to the includ
 Clear Up Your Desk Space: With cable management under desk that neatly routes cables through the arms, ErGear dual monitor desk mount give you a messy-free desktop enjoyment . The Package includes all accessories for mounting and access for instant mounting guidance. This dual monitor stand is built-in USB port which provides an easy way to charge your USB devices.
 
 
-https://amzn.to/3H4It8n
+https://www.amazon.com/dp/B07DGBVRTM?tag=solarhub05-20
 https://m.media-amazon.com/images/I/71yQW9S+j3L._AC_SL1500_.jpg
 Blue Yeti Boom Arm Adjustable Suspension Microphone Mic Stand Desk with Shock Mount 3/8'' to 5/8'' Screw Adapter Pop Filter for Live Streaming Podcasting Gaming, Recording
 About this item
@@ -42,7 +42,7 @@ About this item
 【Microphone Arm Stand bundle 】Professional Recording Blue snowball Blue Yeti mic stand with Metal Shock Mount , double layer Pop Filter , Screw adapter,blue yeti microphone cover foam, Table mounting clamp with sponge pad,all in one for Blue mic stand desk.
 
 
-https://amzn.to/3TWjlDR
+https://www.amazon.com/dp/B0B2DGPMZQ?tag=solarhub05-20
 https://m.media-amazon.com/images/I/71ViT1ZH5YL._AC_SL1500_.jpg
 NEEWER Ring Light RP19H 19 Inch with Tripod Stand 3 Phone Holders Compatible with iPhone, Upgraded 2.4G Touch Control Ringlight for Video Recording Streaming Home Office Zoom Selfie Makeup Lighting
 About this item
@@ -53,7 +53,7 @@ About this item
 【Package Contents】1 x 19 inches LED Ring Light, 1 x Ring Light Tripod Stand, 3 x Adjustable Phone Holder, 1 x Remote Control, 1 x Selfie Shutter, 1 x Power Cord, 1 x Carry Bag, 1 x User Manual
 
 
-https://amzn.to/46v1344
+https://www.amazon.com/dp/B0B1L3BL1G?tag=solarhub05-20
 https://m.media-amazon.com/images/I/81K80A6f12L._AC_SL1500_.jpg
 Brother P-Touch PTD220 Home/Office Everyday Label Maker | Prints TZe Label Tapes up to ~1/2 inch White
 About this item
@@ -63,7 +63,7 @@ Personalize Your Labels: Choose from 14 different fonts, 11 font styles, 99 desi
 Built-in Memory: Save up to 30 frequently used labels Create them, save them, find them, and reprint them as many times as needed
 Create and Print Quickly and Easily: Use the 25 pre-set label templates to create and print professional-looking labels in an instant with a variety of templates for home and workplace organization, and more
 
-https://amzn.to/4o5ER6M
+https://www.amazon.com/s?k=YouTube+Secrets+Sean+Cannell&tag=solarhub05-20
 https://m.media-amazon.com/images/I/71GjUdFS5hL._SL1500_.jpg
 YouTube Secrets: The Ultimate Guide to Growing Your Following and Making Money as a Video Influencer
 YouTube sensations and best-selling authors Sean Cannell and Benji Travis take your YouTube channel from slow and dormant to accelerated and engaged, using premium and updated YouTube growth tips for creators, business owners, digital entrepreneurs, and influencers. This is the ultimate game plan to grow a following and make money with the power of video.
@@ -88,7 +88,7 @@ There's not a single person who can't grow on YouTube. Sean and Benji are ready 
 
 
 
-https://amzn.to/40Z9eCb
+https://www.amazon.com/dp/B08G7RG9ML?tag=solarhub05-20
 https://m.media-amazon.com/images/I/81ZHXEuhgIL._AC_SL1500_.jpg
 Shure MV7 USB Podcast Microphone for Podcasting, Recording, Live Streaming & Gaming, Built-in Headphone Output, All Metal USB/XLR Dynamic Mic, Voice-Isolating Technology, TeamSpeak Certified - Black
 About this item
